@@ -1,70 +1,201 @@
-# Getting Started with Create React App
+# Vulnerability Scanner
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A comprehensive port scanner with vulnerability detection and security recommendations. This tool scans target hosts for open ports, identifies potential security vulnerabilities, and provides actionable recommendations for improving security posture.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Port Scanning**: Basic and version detection scanning using Nmap
+- **Real-time Vulnerability Detection**: Uses online APIs (NVD, CVE Details) to find current vulnerabilities
+- **Risk Assessment**: Categorizes vulnerabilities by severity (Critical, High, Medium, Low) based on CVSS scores
+- **Security Recommendations**: Provides specific action items and alternative services
+- **Version Analysis**: Cross-references detected software versions with live vulnerability databases
+- **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
 
-### `npm start`
+## Architecture
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Frontend**: React.js with Tailwind CSS
+- **Backend**: FastAPI with Python
+- **Vulnerability Data**: Real-time online APIs (NVD, CVE Details)
+- **Scanning Engine**: Python-Nmap integration
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Prerequisites
 
-### `npm test`
+- Node.js (v14 or higher)
+- Python 3.8 or higher
+- Nmap installed on your system
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Installing Nmap
 
-### `npm run build`
+**Windows:**
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+# Using Chocolatey
+choco install nmap
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# Or download from https://nmap.org/download.html
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**macOS:**
 
-### `npm run eject`
+```bash
+brew install nmap
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+**Linux:**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+# Ubuntu/Debian
+sudo apt-get install nmap
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# CentOS/RHEL
+sudo yum install nmap
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Installation
 
-## Learn More
+1. **Clone the repository:**
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+git clone <repository-url>
+cd vuln-scanner
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+2. **Install dependencies:**
 
-### Code Splitting
+```bash
+# Install frontend dependencies
+npm install
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+# Install backend dependencies
+pip install -r src/backend/requirements.txt
+```
 
-### Analyzing the Bundle Size
+## Running the Application
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Quick Start (Recommended)
 
-### Making a Progressive Web App
+```bash
+# Start all services with one command
+python start.py
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+This will automatically:
 
-### Advanced Configuration
+- Start the backend API server
+- Start the frontend development server
+- Check all dependencies
+- Open the application at `http://localhost:3000`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Manual Start
 
-### Deployment
+If you prefer to start services individually:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+```bash
+# Terminal 1: Start backend
+cd src/backend
+python -m uvicorn main:app --reload --port 8000
 
-### `npm run build` fails to minify
+# Terminal 2: Start frontend
+npm start
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+### Stop Services
+
+```bash
+# Stop all services
+python stop.py
+```
+
+## Usage
+
+1. **Open the application** in your browser at `http://localhost:3000`
+2. **Enter a target** (IP address or domain name)
+3. **Select scan type**:
+   - **Basic**: Quick port scan
+   - **Version Detection**: Detailed service and version detection
+4. **Click Scan** to start the vulnerability assessment
+5. **Review results** including:
+   - Open ports and services
+   - Risk summary with vulnerability counts
+   - Detailed vulnerability information
+   - Security recommendations
+   - Alternative service suggestions
+
+## API Endpoints
+
+- `POST /api/scan` - Perform vulnerability scan
+- `GET /api/vulnerabilities` - Get all vulnerabilities from database
+- `GET /api/recommendations/{port}` - Get recommendations for specific port
+
+## Database Schema
+
+The application uses SQLite with the following tables:
+
+- **ports**: Port numbers, services, and descriptions
+- **vulnerabilities**: CVE data, severity, affected versions
+- **recommendations**: Security recommendations and alternatives
+- **service_versions**: Version-specific vulnerability patterns
+
+## Security Features
+
+### Vulnerability Detection
+
+- CVE database integration
+- CVSS scoring
+- Version-specific vulnerability matching
+- Severity classification
+
+### Recommendations
+
+- Actionable security improvements
+- Alternative service suggestions
+- Priority-based recommendations
+- Detailed implementation guidance
+
+### Risk Assessment
+
+- Real-time risk calculation
+- Visual risk indicators
+- Comprehensive risk summary
+
+## Example Scans
+
+### Basic Scan
+
+Scans common ports and identifies open services.
+
+### Version Detection Scan
+
+Performs detailed service fingerprinting and version detection, then cross-references with vulnerability database.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## Security Notice
+
+This tool is designed for authorized security testing only. Always ensure you have permission to scan target systems. Unauthorized scanning may violate laws and terms of service.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Nmap not found**: Ensure Nmap is installed and in your PATH
+2. **Permission denied**: Some scans may require elevated privileges
+3. **Backend connection failed**: Ensure the backend server is running on port 8000
+4. **Database errors**: The SQLite database will be created automatically on first run
+
+### Getting Help
+
+- Check the console for error messages
+- Ensure all dependencies are installed
+- Verify Nmap is working: `nmap --version`
+- Check firewall settings if scans fail
