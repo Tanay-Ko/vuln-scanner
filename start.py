@@ -53,6 +53,34 @@ def start_backend():
         print(f"❌ Error starting backend: {e}")
         return None
 
+def start_zap():
+    """Start OWASP ZAP in daemon mode"""
+    print("🛡️ Starting OWASP ZAP...")
+    
+    zap_path = Path("C:/Program Files/ZAP/Zed Attack Proxy")
+    zap_jar = zap_path / "zap-2.16.1.jar"
+    
+    if not zap_jar.exists():
+        print(f"❌ ZAP JAR file not found at {zap_jar}")
+        return None
+    
+    try:
+        # Start ZAP in daemon mode with API enabled
+        process = subprocess.Popen([
+            "java", "-Xmx512m", "-jar", str(zap_jar),
+            "-daemon", "-port", "8080", "-config", "api.disablekey=true"
+        ], cwd=str(zap_path))
+        
+        # Wait for ZAP to be ready
+        if check_port(8080, "ZAP API", timeout=60):
+            return process
+        else:
+            process.terminate()
+            return None
+    except Exception as e:
+        print(f"❌ Error starting ZAP: {e}")
+        return None
+
 def start_frontend():
     """Start the React frontend"""
     print("🌐 Starting Frontend...")
@@ -108,6 +136,26 @@ def check_dependencies():
         print("❌ npm not found")
         return False
     
+    # Check Java
+    try:
+        java_version = subprocess.check_output(["java", "-version"], text=True, stderr=subprocess.STDOUT).strip()
+        if "version" in java_version.lower():
+            print(f"✅ Java: {java_version.split()[2] if len(java_version.split()) > 2 else 'Available'}")
+        else:
+            print("❌ Java not found")
+            return False
+    except:
+        print("❌ Java not found")
+        return False
+    
+    # Check ZAP installation
+    zap_path = Path("C:/Program Files/ZAP/Zed Attack Proxy")
+    if zap_path.exists():
+        print("✅ ZAP: Installed")
+    else:
+        print("❌ ZAP not found at expected location")
+        return False
+    
     return True
 
 def main():
@@ -123,6 +171,14 @@ def main():
     processes = []
     
     try:
+        # Start ZAP first (required for web scans)
+        zap_process = start_zap()
+        if zap_process:
+            processes.append(("ZAP", zap_process))
+        else:
+            print("❌ Failed to start ZAP")
+            return 1
+        
         # Start backend
         backend_process = start_backend()
         if backend_process:
@@ -144,6 +200,7 @@ def main():
         print("🌐 Frontend:    http://localhost:3000")
         print("🔧 Backend API: http://localhost:8000")
         print("📖 API Docs:    http://localhost:8000/docs")
+        print("🛡️ ZAP API:     http://localhost:8080")
         print("\n💡 Press Ctrl+C to stop all services")
         
         # Keep running until interrupted

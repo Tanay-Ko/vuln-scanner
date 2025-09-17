@@ -32,30 +32,61 @@ def _run_zap_scan(url: str, time_limit: int = None):
         try:
             response = requests.get(f"{zap_api_url}/JSON/core/view/version/", timeout=5)
             if response.status_code != 200:
-                return { "error": "ZAP API not accessible. Make sure ZAP is running on localhost:8080" }
-        except requests.exceptions.RequestException:
-            return { "error": "ZAP API not accessible. Make sure ZAP is running on localhost:8080" }
+                return { 
+                    "error": "ZAP API not accessible. Make sure ZAP is running on localhost:8080. " +
+                            "Start ZAP with: java -jar zap-2.16.1.jar -daemon -port 8080 -config api.disablekey=true"
+                }
+        except requests.exceptions.ConnectionError:
+            return { 
+                "error": "Cannot connect to ZAP API on localhost:8080. " +
+                        "Please ensure ZAP is running. Start it with: " +
+                        "java -jar zap-2.16.1.jar -daemon -port 8080 -config api.disablekey=true"
+            }
+        except requests.exceptions.RequestException as e:
+            return { 
+                "error": f"ZAP API connection failed: {str(e)}. " +
+                        "Make sure ZAP is running on localhost:8080"
+            }
         
         # Start a new session
         session_name = f"scan_{int(time.time())}"
-        requests.get(f"{zap_api_url}/JSON/core/action/newSession/?name={session_name}")
+        try:
+            session_response = requests.get(f"{zap_api_url}/JSON/core/action/newSession/?name={session_name}", timeout=10)
+            if session_response.status_code != 200:
+                return { "error": f"Failed to create ZAP session: {session_response.text}" }
+        except requests.exceptions.RequestException as e:
+            return { "error": f"Failed to create ZAP session: {str(e)}" }
         
         # Access the target URL
-        requests.get(f"{zap_api_url}/JSON/core/action/accessUrl/?url={url}")
+        try:
+            access_response = requests.get(f"{zap_api_url}/JSON/core/action/accessUrl/?url={url}", timeout=10)
+            if access_response.status_code != 200:
+                return { "error": f"Failed to access target URL: {access_response.text}" }
+        except requests.exceptions.RequestException as e:
+            return { "error": f"Failed to access target URL: {str(e)}" }
         
         # Wait a moment for the page to load
         time.sleep(2)
         
-        # Run a quick spider scan (limited scope)
-        spider_id = requests.get(f"{zap_api_url}/JSON/spider/action/scan/?url={url}&maxChildren=5&recurse=false").json().get('scan')
+        # Run a quick spider scan (very limited scope)
+        try:
+            spider_response = requests.get(f"{zap_api_url}/JSON/spider/action/scan/?url={url}&maxChildren=2&recurse=false&maxDepth=1", timeout=10)
+            if spider_response.status_code != 200:
+                return { "error": f"Failed to start spider scan: {spider_response.text}" }
+            spider_data = spider_response.json()
+            spider_id = spider_data.get('scan')
+            if not spider_id:
+                return { "error": f"Spider scan failed to start: {spider_data}" }
+        except requests.exceptions.RequestException as e:
+            return { "error": f"Failed to start spider scan: {str(e)}" }
         
-        # Calculate time limits based on user input
+        # Calculate time limits based on user input - much shorter for faster results
         if time_limit:
-            spider_time = min(30, time_limit // 3)  # Use 1/3 of time for spider
-            active_scan_time = time_limit - spider_time - 10  # Use remaining time minus buffer
+            spider_time = min(10, time_limit // 6)  # Use 1/6 of time for spider, max 10 seconds
+            active_scan_time = min(20, time_limit - spider_time - 5)  # Use remaining time minus buffer, max 20 seconds
         else:
-            spider_time = 30  # Default 30 seconds
-            active_scan_time = 60  # Default 1 minute
+            spider_time = 10  # Default 10 seconds
+            active_scan_time = 20  # Default 20 seconds
         
         # Wait for spider to complete
         max_wait = spider_time
@@ -71,7 +102,16 @@ def _run_zap_scan(url: str, time_limit: int = None):
             wait_time += 2
         
         # Run a quick active scan (limited to common vulnerabilities)
-        active_scan_id = requests.get(f"{zap_api_url}/JSON/ascan/action/scan/?url={url}&scanPolicyName=Default Policy").json().get('scan')
+        try:
+            active_scan_response = requests.get(f"{zap_api_url}/JSON/ascan/action/scan/?url={url}&scanPolicyName=Default Policy&maxResults=50", timeout=10)
+            if active_scan_response.status_code != 200:
+                return { "error": f"Failed to start active scan: {active_scan_response.text}" }
+            active_scan_data = active_scan_response.json()
+            active_scan_id = active_scan_data.get('scan')
+            if not active_scan_id:
+                return { "error": f"Active scan failed to start: {active_scan_data}" }
+        except requests.exceptions.RequestException as e:
+            return { "error": f"Failed to start active scan: {str(e)}" }
         
         # Wait for active scan to complete
         max_wait = active_scan_time
@@ -83,12 +123,24 @@ def _run_zap_scan(url: str, time_limit: int = None):
                     break
             except:
                 break  # If we can't get status, assume it's done
-            time.sleep(3)
-            wait_time += 3
+            time.sleep(2)
+            wait_time += 2
+        
+        # Force stop any running scans if they're still going
+        try:
+            requests.get(f"{zap_api_url}/JSON/ascan/action/stop/?scanId={active_scan_id}", timeout=5)
+            requests.get(f"{zap_api_url}/JSON/spider/action/stop/?scanId={spider_id}", timeout=5)
+        except:
+            pass  # Ignore errors when stopping
         
         # Get alerts
-        alerts_response = requests.get(f"{zap_api_url}/JSON/core/view/alerts/?baseurl={url}")
-        alerts_data = alerts_response.json().get('alerts', [])
+        try:
+            alerts_response = requests.get(f"{zap_api_url}/JSON/core/view/alerts/?baseurl={url}", timeout=10)
+            if alerts_response.status_code != 200:
+                return { "error": f"Failed to retrieve alerts: {alerts_response.text}" }
+            alerts_data = alerts_response.json().get('alerts', [])
+        except requests.exceptions.RequestException as e:
+            return { "error": f"Failed to retrieve alerts: {str(e)}" }
         
         findings = []
         for alert in alerts_data:
