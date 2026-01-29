@@ -66,8 +66,12 @@ def start_zap():
     
     try:
         # Start ZAP in daemon mode with API enabled
+        # Use Java 21 explicitly if available, otherwise fallback to system java
+        java_21_path = Path("C:/Program Files/Eclipse Adoptium/jdk-21.0.8.9-hotspot/bin/java.exe")
+        java_cmd = str(java_21_path) if java_21_path.exists() else "java"
+        
         process = subprocess.Popen([
-            "java", "-Xmx512m", "-jar", str(zap_jar),
+            java_cmd, "-Xmx512m", "-jar", str(zap_jar),
             "-daemon", "-port", "8080", "-config", "api.disablekey=true"
         ], cwd=str(zap_path))
         
