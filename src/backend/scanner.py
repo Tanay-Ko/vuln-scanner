@@ -159,6 +159,19 @@ def _run_zap_scan(url: str, time_limit: int = None):
                 "evidence": alert.get('evidence', '')
             })
         
+        # Sort findings by severity (critical first)
+        severity_priority = {
+            'critical': 0,
+            'high': 1,
+            'medium': 2,
+            'low': 3,
+            'info': 4,
+            'informational': 4,
+            'notice': 4
+        }
+        
+        findings.sort(key=lambda x: severity_priority.get(x.get('severity', '').lower(), 999))
+        
         return { "target_url": url, "findings": findings }
         
     except requests.exceptions.RequestException as e:

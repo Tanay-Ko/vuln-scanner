@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import ProgressBar from './ProgressBar';
+import WebScanProgressBar from './WebScanProgressBar';
 
 function WebScanForm() {
   const [target, setTarget] = useState('');
@@ -22,11 +22,11 @@ function WebScanForm() {
     setResults(null);
     setProgress(0);
 
-    // Start progress simulation
-    const tickMs = 200;
+    // Start progress simulation - slower for web scans (reach 90% in ~60 seconds)
+    const tickMs = 1000;
     progressTimer.current = setInterval(() => {
       setProgress((prev) => {
-        const next = prev + Math.random() * 3;
+        const next = prev + Math.random() * 1.5;
         return next >= 90 ? 90 : next;
       });
     }, tickMs);
@@ -153,7 +153,7 @@ function WebScanForm() {
             )}
           </div>
 
-          {loading && <ProgressBar progress={progress} />}
+          {loading && <WebScanProgressBar progress={progress} />}
         </div>
       </div>
 

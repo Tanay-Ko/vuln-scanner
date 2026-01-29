@@ -26,6 +26,26 @@ function WebScanResults({ results }) {
       );
     }
 
+    const getSeverityColor = (severity) => {
+      const sev = (severity || '').toLowerCase();
+      switch (sev) {
+        case 'critical':
+          return 'bg-red-900 text-white border-red-900 dark:bg-red-900 dark:text-white dark:border-red-900';
+        case 'high':
+          return 'bg-red-600 text-white border-red-600 dark:bg-red-600 dark:text-white dark:border-red-600';
+        case 'medium':
+          return 'bg-orange-500 text-white border-orange-500 dark:bg-orange-500 dark:text-white dark:border-orange-500';
+        case 'low':
+          return 'bg-yellow-500 text-white border-yellow-500 dark:bg-yellow-500 dark:text-white dark:border-yellow-500';
+        case 'info':
+        case 'informational':
+        case 'notice':
+          return 'bg-blue-500 text-white border-blue-500 dark:bg-blue-500 dark:text-white dark:border-blue-500';
+        default:
+          return 'bg-gray-500 text-white border-gray-500 dark:bg-gray-500 dark:text-white dark:border-gray-500';
+      }
+    };
+
     const findings = webScan.findings || [];
     
     return (
@@ -49,14 +69,11 @@ function WebScanResults({ results }) {
                   <h4 className="font-semibold text-yellow-800 dark:text-yellow-300">
                     {finding.name}
                   </h4>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    finding.severity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                    finding.severity === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                    finding.severity === 'low' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                    'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                  }`}>
-                    {finding.severity}
-                  </span>
+                  {finding.severity && (
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getSeverityColor(finding.severity)}`}>
+                      {finding.severity.toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 
                 <p className="text-yellow-700 dark:text-yellow-400 mb-2">
