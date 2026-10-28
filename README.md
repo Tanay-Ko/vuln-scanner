@@ -1,8 +1,12 @@
-# Vulnerability Scanner
+# VulnScan
 
-A security scanning dashboard with a React frontend and FastAPI backend. Gitleaks and Trivy run
-in GitHub Actions against repository checkouts; Nmap and OWASP ZAP scan an authorized live-site
-target through the application.
+VulnScan currently provides a reusable GitHub Actions workflow for scanning repository source and
+dependencies with Gitleaks and Trivy. For another repository, users add one workflow file; they do
+not install this application or its scanner dependencies.
+
+The repository also contains a local-development dashboard for authorized live-site checks. A
+production VM deployment path is not documented or provided here yet; the local setup below is
+for development only.
 
 ## Features
 
@@ -16,7 +20,9 @@ target through the application.
 - **Target Policy**: Live-site requests are limited by the backend's exact-host allowlist and scanner timeouts
 - **Modern UI**: Responsive React and Tailwind CSS interface with light/dark themes
 
-## Architecture
+## Local dashboard architecture
+
+The following describes the local-development dashboard, not a deployed service.
 
 - **Frontend**: React.js with Tailwind CSS
 - **Backend**: FastAPI with Python
@@ -24,7 +30,46 @@ target through the application.
 - **Scanning Engine**: Modular scanner adapters and a sequential live-site pipeline orchestrator
 - **Source Scanning**: Separate GitHub Actions workflow scans the repository checkout; a website URL is never treated as source code
 
-## Prerequisites
+## Use the scanner in another repository
+
+If you only want Gitleaks and Trivy checks in another GitHub repository, you do **not** need to
+install this dashboard, Python, Node.js, Nmap, ZAP, Gitleaks, or Trivy there. Add one caller workflow
+file to that repository and GitHub Actions will run the shared workflow on a GitHub-hosted runner.
+The repository owner needs GitHub Actions enabled and must commit the file.
+
+Create `.github/workflows/source-security.yml` in the repository:
+
+```yaml
+name: Source Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-security:
+    uses: Tanay-Ko/vuln-scanner/.github/workflows/source-security.yml@da19725883ecf1eb5281ff79fbb22002586426c7
+```
+
+Change `main` to the branch you want checked, then commit and push this file. The pinned reusable
+workflow checks out the calling repository, installs its own pinned Gitleaks and Trivy binaries, and
+runs both scans there. No scanner dependencies or workflow copies are needed in the calling
+repository. If GitHub Actions policy in your organization restricts reusable workflows, allow
+`Tanay-Ko/vuln-scanner` in that repository's Actions settings.
+
+This one-file setup is only for repository source and dependency checks. To run the VulnScan web
+dashboard locally, follow the installation instructions below; those install the dashboard's
+frontend and backend dependencies.
+
+## Run the dashboard locally (development only)
+
+These requirements are only for developers running the dashboard from this repository. They are
+not requirements for a user enabling the GitHub Actions workflow in another repository.
 
 - Node.js (v14 or higher)
 - Python 3.8 or higher
@@ -69,7 +114,7 @@ sudo apt-get install nmap
 sudo yum install nmap
 ```
 
-## Installation
+### Install local development dependencies
 
 1. **Clone the repository:**
 
@@ -88,7 +133,7 @@ npm install
 pip install -r src/backend/requirements.txt
 ```
 
-## Running the Application
+### Run the local dashboard
 
 ### Quick Start (Recommended)
 
@@ -147,35 +192,14 @@ weekly, and when manually dispatched. It is also reusable from another repositor
 application's backend. Gitleaks output is redacted; the workflow does not upload scanner report
 artifacts.
 
-To enable it, push this workflow to GitHub and ensure Actions are enabled for the repository. Review
-its first run in the **Actions** tab. For a required merge gate, configure branch protection or a
-ruleset for `master` to require the **Gitleaks and Trivy** check.
+For this repository, the workflow runs on pull requests, pushes to `master`, weekly, and manual
+dispatch. Ensure GitHub Actions are enabled and review results in the **Actions** tab. For a required
+merge gate, configure branch protection or a ruleset for `master` to require the **Gitleaks and
+Trivy** check.
 
-To use it in another repository, add a small caller workflow there. Replace
-`<PINNED_COMMIT_SHA>` with the full commit SHA of the desired version of this reusable workflow; pin
-to a SHA rather than a moving branch or tag so workflow updates are deliberate:
-
-```yaml
-name: Source Security
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  source-security:
-    uses: Tanay-Ko/vuln-scanner/.github/workflows/source-security.yml@<PINNED_COMMIT_SHA>
-```
-
-Change `main` to the branch used by that repository. Replace the placeholder with a real, full
-commit SHA before committing the caller workflow. The reusable workflow scans the calling
-repository's checkout. The repository owner still needs to add and commit this caller file; automatic
-installation without a repository change would require a separately authorized GitHub App integration.
+For another repository, follow the one-file instructions above. The reusable workflow scans the
+calling repository's checkout. Automatically adding the caller file without a repository change
+would require a separately authorized GitHub App integration.
 
 ### Implementation map
 

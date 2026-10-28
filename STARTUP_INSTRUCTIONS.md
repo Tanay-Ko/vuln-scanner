@@ -1,6 +1,11 @@
 # VulnScan Startup Instructions
 
-## Start the application
+These instructions are for running the dashboard locally during development. They are not
+production VM deployment instructions. For repository scans in another GitHub repository, users
+only need the caller workflow described in the README; they do not install this application or
+Gitleaks/Trivy dependencies.
+
+## Start the local development application
 
 Run `python start.py` from the repository root. This starts the FastAPI backend and React
 development server; it does not start ZAP or run scans automatically. Live-site scans run OWASP
