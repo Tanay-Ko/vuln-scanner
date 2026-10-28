@@ -40,6 +40,7 @@ jobs:
           trivy_archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           trivy_checksums="trivy_${TRIVY_VERSION}_checksums.txt"
           mkdir -p "$RUNNER_TEMP/gitleaks" "$RUNNER_TEMP/trivy"
+          cd "$RUNNER_TEMP"
 
           curl --fail --location --silent --show-error \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${gitleaks_archive}" \
@@ -77,7 +78,6 @@ jobs:
 
       - name: Scan dependencies for known vulnerabilities
         id: trivy
-        if: always()
         continue-on-error: true
         run: trivy fs --scanners vuln --format table --exit-code 1 --no-progress .
 
