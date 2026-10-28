@@ -1,13 +1,13 @@
 import sqlite3
 import json
-import requests
-import time
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
+from contextlib import closing
 
 class VulnerabilityDB:
-    def __init__(self, db_path: str = "vulnerabilities.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = str(db_path or (Path(__file__).resolve().parent / "vulnerabilities.db"))
         self.init_database()
         self.populate_initial_data()
     
@@ -73,9 +73,68 @@ class VulnerabilityDB:
                 FOREIGN KEY (port_id) REFERENCES ports (id)
             )
         ''')
+
+        # A single latest snapshot per target/type avoids duplicate scans while
+        # preserving a transactional set of associated port rows.
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scan_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                target TEXT NOT NULL,
+                scan_type TEXT NOT NULL,
+                scan_time TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(target, scan_type)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scan_ports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scan_run_id INTEGER NOT NULL,
+                port_number INTEGER NOT NULL,
+                state TEXT,
+                service_name TEXT,
+                version TEXT,
+                product TEXT,
+                details_json TEXT NOT NULL DEFAULT '{}',
+                UNIQUE(scan_run_id, port_number),
+                FOREIGN KEY (scan_run_id) REFERENCES scan_runs(id) ON DELETE CASCADE
+            )
+        ''')
         
         conn.commit()
         conn.close()
+
+    def save_scan_snapshot(self, target: str, scan_type: str, scan_time, ports: List[Dict[str, Any]]):
+        """Atomically replace a target/type snapshot and its ports."""
+        with closing(sqlite3.connect(self.db_path, timeout=5)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            with conn:
+                conn.execute(
+                    """INSERT INTO scan_runs (target, scan_type, scan_time, created_at)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(target, scan_type) DO UPDATE SET
+                           scan_time = excluded.scan_time,
+                           created_at = excluded.created_at""",
+                    (target, scan_type, str(scan_time) if scan_time is not None else None,
+                     datetime.now(timezone.utc).isoformat(timespec="seconds"))
+                )
+                row = conn.execute(
+                    "SELECT id FROM scan_runs WHERE target = ? AND scan_type = ?",
+                    (target, scan_type)
+                ).fetchone()
+                run_id = row[0]
+                conn.execute("DELETE FROM scan_ports WHERE scan_run_id = ?", (run_id,))
+                conn.executemany(
+                    """INSERT INTO scan_ports
+                       (scan_run_id, port_number, state, service_name, version, product, details_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    [
+                        (run_id, int(port["port"]), port.get("state"), port.get("service"),
+                         port.get("version"), port.get("product"), json.dumps(port))
+                        for port in ports if isinstance(port, dict) and port.get("port") is not None
+                    ]
+                )
+        return run_id
     
     def populate_initial_data(self):
         """Populate the database with initial vulnerability data"""

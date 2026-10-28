@@ -1,39 +1,54 @@
 #!/usr/bin/env python3
 """
 Unified startup script for VulnScan
-Starts all required services: ZAP, Backend, and Frontend
+Starts the local backend and frontend services.
 """
 import subprocess
 import sys
-import os
 import time
 import requests
-import threading
 from pathlib import Path
 
-def check_port(port, service_name, timeout=30):
+def check_port(port, service_name, timeout=30, expected_api_route=None):
     """Check if a service is running on a port"""
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            response = requests.get(f"http://localhost:{port}", timeout=2)
-            if response.status_code in [200, 404]:  # 404 is OK for some services
-                print(f"✅ {service_name} is ready on port {port}")
+            health_path = "/openapi.json" if expected_api_route else "/"
+            response = requests.get(
+                f"http://localhost:{port}{health_path}",
+                timeout=2,
+            )
+            if expected_api_route and response.status_code == 200:
+                try:
+                    routes = response.json().get("paths", {})
+                except ValueError:
+                    routes = {}
+                if expected_api_route not in routes:
+                    print(
+                        f"[ERROR] {service_name} on port {port} does not expose "
+                        f"{expected_api_route}"
+                    )
+                    return False
+                print(f"[OK] {service_name} is ready on port {port}")
+                return True
+            if not expected_api_route and response.status_code in [200, 404]:
+                print(f"[OK] {service_name} is ready on port {port}")
                 return True
         except requests.exceptions.RequestException:
             pass
         time.sleep(2)
-    print(f"❌ {service_name} failed to start within {timeout} seconds")
+    print(f"[ERROR] {service_name} failed to start within {timeout} seconds")
     return False
 
 def start_backend():
     """Start the FastAPI backend server"""
-    print("🔧 Starting Backend Server...")
+    print("[INFO] Starting backend server...")
     backend_dir = Path("src/backend")
     
     # Install requirements if needed
     if not (backend_dir / "requirements.txt").exists():
-        print("❌ Backend requirements.txt not found")
+        print("[ERROR] Backend requirements.txt not found")
         return False
     
     try:
@@ -44,55 +59,23 @@ def start_backend():
         ], cwd=backend_dir)
         
         # Wait for backend to be ready
-        if check_port(8000, "Backend API"):
+        if check_port(8000, "Backend API", expected_api_route="/api/pipeline"):
             return process
         else:
             process.terminate()
             return None
     except Exception as e:
-        print(f"❌ Error starting backend: {e}")
-        return None
-
-def start_zap():
-    """Start OWASP ZAP in daemon mode"""
-    print("🛡️ Starting OWASP ZAP...")
-    
-    zap_path = Path("C:/Program Files/ZAP/Zed Attack Proxy")
-    zap_jar = zap_path / "zap-2.16.1.jar"
-    
-    if not zap_jar.exists():
-        print(f"❌ ZAP JAR file not found at {zap_jar}")
-        return None
-    
-    try:
-        # Start ZAP in daemon mode with API enabled
-        # Use Java 21 explicitly if available, otherwise fallback to system java
-        java_21_path = Path("C:/Program Files/Eclipse Adoptium/jdk-21.0.8.9-hotspot/bin/java.exe")
-        java_cmd = str(java_21_path) if java_21_path.exists() else "java"
-        
-        process = subprocess.Popen([
-            java_cmd, "-Xmx512m", "-jar", str(zap_jar),
-            "-daemon", "-port", "8080", "-config", "api.disablekey=true"
-        ], cwd=str(zap_path))
-        
-        # Wait for ZAP to be ready
-        if check_port(8080, "ZAP API", timeout=60):
-            return process
-        else:
-            process.terminate()
-            return None
-    except Exception as e:
-        print(f"❌ Error starting ZAP: {e}")
+        print(f"[ERROR] Could not start backend: {e}")
         return None
 
 def start_frontend():
     """Start the React frontend"""
-    print("🌐 Starting Frontend...")
+    print("[INFO] Starting frontend...")
     
     try:
         # Check if node_modules exists
         if not Path("node_modules").exists():
-            print("📦 Installing npm dependencies...")
+            print("[INFO] Installing npm dependencies...")
             subprocess.run(["npm", "install"], check=True, shell=True)
         
         # Start React app
@@ -105,90 +88,62 @@ def start_frontend():
             process.terminate()
             return None
     except Exception as e:
-        print(f"❌ Error starting frontend: {e}")
+        print(f"[ERROR] Could not start frontend: {e}")
         return None
 
 def check_dependencies():
     """Check if required dependencies are available"""
-    print("🔍 Checking dependencies...")
+    print("[INFO] Checking dependencies...")
     
     # Check Python
     try:
         python_version = subprocess.check_output([sys.executable, "--version"], text=True).strip()
-        print(f"✅ Python: {python_version}")
+        print(f"[OK] Python: {python_version}")
     except:
-        print("❌ Python not found")
+        print("[ERROR] Python not found")
         return False
     
     # Check Node.js
     try:
         node_version = subprocess.check_output(["node", "--version"], text=True).strip()
-        print(f"✅ Node.js: {node_version}")
+        print(f"[OK] Node.js: {node_version}")
     except:
-        print("❌ Node.js not found")
+        print("[ERROR] Node.js not found")
         return False
     
     # Check npm
     try:
         result = subprocess.run(["npm", "--version"], capture_output=True, text=True, shell=True)
         if result.returncode == 0:
-            print(f"✅ npm: {result.stdout.strip()}")
+            print(f"[OK] npm: {result.stdout.strip()}")
         else:
-            print("❌ npm not found")
+            print("[ERROR] npm not found")
             return False
     except:
-        print("❌ npm not found")
-        return False
-    
-    # Check Java
-    try:
-        java_version = subprocess.check_output(["java", "-version"], text=True, stderr=subprocess.STDOUT).strip()
-        if "version" in java_version.lower():
-            print(f"✅ Java: {java_version.split()[2] if len(java_version.split()) > 2 else 'Available'}")
-        else:
-            print("❌ Java not found")
-            return False
-    except:
-        print("❌ Java not found")
-        return False
-    
-    # Check ZAP installation
-    zap_path = Path("C:/Program Files/ZAP/Zed Attack Proxy")
-    if zap_path.exists():
-        print("✅ ZAP: Installed")
-    else:
-        print("❌ ZAP not found at expected location")
+        print("[ERROR] npm not found")
         return False
     
     return True
 
 def main():
     """Main startup function"""
-    print("🚀 Starting VulnScan - Vulnerability Scanner")
+    print("[INFO] Starting VulnScan - Vulnerability Scanner")
     print("=" * 50)
     
     # Check dependencies
     if not check_dependencies():
-        print("❌ Missing required dependencies. Please install Python, Node.js, and npm.")
+        print("[ERROR] Missing required dependencies. Please install Python, Node.js, and npm.")
         return 1
     
     processes = []
     
     try:
-        # Start ZAP first (required for web scans)
-        zap_process = start_zap()
-        if zap_process:
-            processes.append(("ZAP", zap_process))
-        else:
-            print("❌ Failed to start ZAP")
-            return 1
-        
         # Start backend
         backend_process = start_backend()
         if backend_process:
             processes.append(("Backend", backend_process))
         else:
-            print("❌ Failed to start backend")
+            print("[ERROR] Failed to start backend")
             return 1
         
         # Start frontend
@@ -196,33 +151,32 @@ def main():
         if frontend_process:
             processes.append(("Frontend", frontend_process))
         else:
-            print("❌ Failed to start frontend")
+            print("[ERROR] Failed to start frontend")
             return 1
         
-        print("\n🎉 VulnScan is ready!")
+        print("\n[OK] VulnScan is ready!")
         print("=" * 50)
-        print("🌐 Frontend:    http://localhost:3000")
-        print("🔧 Backend API: http://localhost:8000")
-        print("📖 API Docs:    http://localhost:8000/docs")
-        print("🛡️ ZAP API:     http://localhost:8080")
-        print("\n💡 Press Ctrl+C to stop all services")
+        print("Frontend:    http://localhost:3000")
+        print("Backend API: http://localhost:8000")
+        print("API Docs:    http://localhost:8000/docs")
+        print("\nPress Ctrl+C to stop all services")
         
         # Keep running until interrupted
         try:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("\n🛑 Shutting down services...")
+            print("\n[INFO] Shutting down services...")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] {e}")
         return 1
     
     finally:
         # Clean up processes
         for name, process in processes:
             try:
-                print(f"🛑 Stopping {name}...")
+                print(f"[INFO] Stopping {name}...")
                 process.terminate()
                 process.wait(timeout=5)
             except:
@@ -231,7 +185,7 @@ def main():
                 except:
                     pass
         
-        print("✅ All services stopped")
+        print("[INFO] Startup cleanup completed")
     
     return 0
 

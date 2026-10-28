@@ -3,18 +3,13 @@ import './index.css';
 import React, { useEffect, useState } from 'react';
 import Navigation from './components/Navigation';
 import Documentation from './components/Documentation';
-import NetworkScanForm from './components/NetworkScanForm';
-import WebScanForm from './components/WebScanForm';
+import PipelineRunDashboard from './components/PipelineRunDashboard';
+import SourceSecurityDashboard from './components/SourceSecurityDashboard';
 
 function App() {
   const [theme, setTheme] = useState(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-  const [activeTab, setActiveTab] = useState('network'); // 'network', 'web', or 'docs'
+  const [currentView, setCurrentView] = useState('pipeline');
 
-  const handleTabChange = (newTab) => {
-    setActiveTab(newTab);
-  };
-
-  // Theme management
   useEffect(() => {
     try {
       document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -31,21 +26,16 @@ function App() {
       </div>
 
       <Navigation 
-        activeTab={activeTab}
-        handleTabChange={handleTabChange}
+        currentView={currentView}
+        setCurrentView={setCurrentView}
         theme={theme}
         setTheme={setTheme}
       />
 
-      {/* Main Container */}
       <div className="relative max-w-4xl mx-auto px-4 animate-fadeIn">
-        {activeTab === 'docs' ? (
-          <Documentation />
-        ) : activeTab === 'network' ? (
-          <NetworkScanForm />
-        ) : activeTab === 'web' ? (
-          <WebScanForm />
-        ) : null}
+        {currentView === 'source-security' ? <SourceSecurityDashboard />
+          : currentView === 'documentation' ? <Documentation />
+            : <PipelineRunDashboard />}
       </div>
     </div>
   );

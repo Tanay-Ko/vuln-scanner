@@ -7,6 +7,10 @@
 
 # testing
 /coverage
+/src/backend/reports/
+/bin/
+__pycache__/
+*.py[cod]
 
 # production
 /build
